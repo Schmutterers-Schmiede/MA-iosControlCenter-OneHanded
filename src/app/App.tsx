@@ -425,20 +425,26 @@ export default function App() {
   const timeToOpenRef = useRef<number | null>(null);
   const [showInstructions, setShowInstructions] = useState(true);
   const [ccOpen, setCcOpen] = useState(false);
-  const [hasOpenedOnce, setHasOpenedOnce] = useState(false);
+  const [openCount, setOpenCount] = useState(0);
+  const [hasOpenedThreeTimes, setHasOpenedThreeTimes] = useState(false);
 
   function handleStart() {
     startTimeRef.current = Date.now(); // timer starts here, not on page load
     timeToOpenRef.current = null;
-    setHasOpenedOnce(false);
+    setOpenCount(0);
+    setHasOpenedThreeTimes(false);
     setShowInstructions(false);
   }
 
-  function markOpenedIfFirstTime() {
-    if (timeToOpenRef.current === null) {
-      timeToOpenRef.current = Date.now() - startTimeRef.current;
-      setHasOpenedOnce(true);
-    }
+  function markOpened() {
+    setOpenCount((prev) => {
+      const next = prev + 1;
+      if (next >= 3 && timeToOpenRef.current === null) {
+        timeToOpenRef.current = Date.now() - startTimeRef.current;
+        setHasOpenedThreeTimes(true);
+      }
+      return next;
+    });
   }
   const mouseStartY = useRef<number | null>(null);
 
@@ -458,9 +464,9 @@ export default function App() {
     if (mouseStartY.current === null) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const relY = e.clientY - rect.top;
-    if (relY - mouseStartY.current > 30) {
+    if (relY - mouseStartY.current > 30 && !ccOpen) {
       setCcOpen(true);
-      markOpenedIfFirstTime();
+      markOpened();
     }
     mouseStartY.current = null;
   }
@@ -479,9 +485,9 @@ export default function App() {
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartY.current === null) return;
     const t = e.changedTouches[0];
-    if (t.clientY - touchStartY.current > 40) {
+    if (t.clientY - touchStartY.current > 40 && !ccOpen) {
       setCcOpen(true);
-      markOpenedIfFirstTime();
+      markOpened();
     }
     touchStartY.current = null;
   }
@@ -491,7 +497,7 @@ export default function App() {
 
   function handleRateClick() {
     const ctx = getContext();
-    // Falls back to time-since-start if they never completed the gesture,
+    // Falls back to time-since-start if they never completed all 3 opens,
     // so we still capture something rather than sending null.
     const elapsed = timeToOpenRef.current ?? (Date.now() - startTimeRef.current);
     const hiddenParams = {
@@ -614,12 +620,23 @@ export default function App() {
 
       {/* Rate this prototype — testing UI, not part of the docked interface,
           so it lives in the outer full-screen container. */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-40">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2">
+        <button
+          onClick={() => setShowInstructions(true)}
+          aria-label="Show instructions again"
+          className="w-11 h-11 rounded-full bg-white text-gray-700 flex items-center justify-center shadow-md active:scale-95 transition-transform"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </button>
         <button
           onClick={handleRateClick}
-          disabled={!hasOpenedOnce}
+          disabled={!hasOpenedThreeTimes}
           className={`text-sm font-bold px-7 py-3 rounded-full transition-all ${
-            hasOpenedOnce
+            hasOpenedThreeTimes
               ? "bg-blue-500 text-white shadow-[0_4px_20px_rgba(59,130,246,0.6)] active:scale-95"
               : "bg-gray-300 text-gray-400 cursor-not-allowed"
           }`}
